@@ -9,6 +9,7 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/pressly/goose/v3"
+	"github.com/sirupsen/logrus"
 )
 
 func LoadEnv() {
@@ -41,7 +42,7 @@ func main() {
 	log.Printf("%d Migrations applied successfully", applied)
 
 	//запускаем сервер
-	log.Printf("Запускаем сервер")
+	logrus.Info("Запускаем сервер")
 	http.Handlefunc()
 	err = http.ListenAndServe(":dbPort", nil)
 	if err != nil {

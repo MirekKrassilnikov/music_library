@@ -1,88 +1,76 @@
 package services
 
 import (
+	"database/sql"
+	"fmt"
 	"log"
-	"net/http"
-	"strconv"
 	"strings"
 
+	"github.com/MirekKrassilnikov/music_library/dto"
 	"github.com/MirekKrassilnikov/music_library/models"
 )
 
-func GetAllSongs(w http.ResponseWriter, r *http.Request) {
-	group := r.URL.Query().Get("group")
-	song := r.URL.Query().Get("song")
-	releaseDate := r.URL.Query().Get("releaseDate")
-	text := r.URL.Query().Get("text")
-	link := r.URL.Query().Get("link")
+type SongService struct {
+	DB *sql.DB
+}
 
-	pageStr := r.URL.Query().Get("page")
-	limitStr := r.URL.Query().Get("limit")
-
-	if pageStr != "" {
-		var err error
-		page, err := strconv.Atoi(pageStr)
-		if err != nil || page < 1 {
-			page = 1
-		}
-	}
-	if limitStr != "" {
-		var err error
-		limit, err := strconv.Atoi(limitStr)
-		if err != nil || limit < 1 {
-			limit = 10
-		}
-	}
+// GetAllSongs обрабатывает бизнес-логику поиска песен
+func (s *SongService) GetAllSongs(filters dto.GetSongsFilterDTO) ([]models.Song, error) {
 
 	var AppendStrings []string
 	queryString := "SELECT * FROM songs WHERE "
 
-	if group != "" {
-		appendString1 := "LOWER (group_name) LIKE LOWER ('%" + group + "%')"
+	// Добавляем фильтры
+	if filters.Group != "" {
+		appendString1 := "LOWER (group_name) LIKE LOWER ('%" + filters.Group + "%')"
 		AppendStrings = append(AppendStrings, appendString1)
 	}
 
-	if song != "" {
-		appendString2 := "LOWER (song_name) LIKE LOWER ('%" + song + "%')"
+	if filters.Song != "" {
+		appendString2 := "LOWER (song_name) LIKE LOWER ('%" + filters.Song + "%')"
 		AppendStrings = append(AppendStrings, appendString2)
 	}
 
-	if releaseDate != "" {
-		appendString3 := "release_date ='" + releaseDate + "'"
+	if filters.ReleaseDate != "" {
+		appendString3 := "release_date ='" + filters.ReleaseDate + "'"
 		AppendStrings = append(AppendStrings, appendString3)
 	}
 
-	if text != "" {
-		appendString4 := "LOWER (text) LIKE LOWER ('%" + text + "%')"
+	if filters.Text != "" {
+		appendString4 := "LOWER (text) LIKE LOWER ('%" + filters.Text + "%')"
 		AppendStrings = append(AppendStrings, appendString4)
 	}
 
-	if link != "" {
-		appendString5 := "LOWER (link) LIKE LOWER ('%" + link + "%')"
+	if filters.Link != "" {
+		appendString5 := "LOWER (link) LIKE LOWER ('%" + filters.Link + "%')"
 		AppendStrings = append(AppendStrings, appendString5)
 	}
 
+	// Объединяем фильтры
 	if len(AppendStrings) > 0 {
 		queryString += strings.Join(AppendStrings, " AND ")
 	}
 
+	// Добавляем пагинацию
+	offset := (filters.Page - 1) * filters.Limit
+	queryString += fmt.Sprintf(" LIMIT %d OFFSET %d", filters.Limit, offset)
+
 	log.Print(queryString)
 
-	rows, err := db.Query(queryString)
+	rows, err := s.DB.Query(queryString)
 	if err != nil {
-		http.Error(w, "Database query failed", http.StatusInternalServerError)
-		return
+		return nil, fmt.Errorf("database query failed: %w", err)
 	}
 	defer rows.Close()
 
 	var Songs []models.Song
 	for rows.Next() {
 		var song models.Song
-		if err := rows.Scan(&song.Group, &Song.Song, &song.Text, &song.ReleaseDate, &song.Link); err != nil {
-			http.Error(w, "Error reading from database", http.StatusInternalServerError)
-			return
+		if err := rows.Scan(&song.Group, &song.Song, &song.Text, &song.ReleaseDate, &song.Link); err != nil {
+			return nil, fmt.Errorf("error reading from database: %w", err)
 		}
+
 		Songs = append(Songs, song)
 	}
-
+	return Songs, nil
 }

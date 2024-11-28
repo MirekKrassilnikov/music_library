@@ -5,6 +5,6 @@ type Song struct {
 	Group       string `json:"group"`
 	Song        string `json:"song"`
 	Text        string `json:"text"`
-	ReleaseDate string `json:"releaseDate"`
+	ReleaseDate string `json:"releasedate"`
 	Link        string `json:"link"`
 }
