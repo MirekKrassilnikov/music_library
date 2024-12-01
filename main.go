@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/MirekKrassilnikov/music_library/handlers"
+	"github.com/MirekKrassilnikov/music_library/services"
 	"github.com/joho/godotenv"
 	"github.com/pressly/goose/v3"
 	"github.com/sirupsen/logrus"
@@ -40,10 +42,15 @@ func main() {
 		log.Fatalf("failed to apply migrations: %v", err)
 	}
 	log.Printf("%d Migrations applied successfully", applied)
+	// Создаем SongService
+	songService := &services.SongService{DB: db}
+
+	// Создаем SongHandler
+	songHandler := &handlers.SongHandler{SongService: songService}
 
 	//запускаем сервер
 	logrus.Info("Запускаем сервер")
-	http.Handlefunc()
+	http.HandleFunc("/songs", songHandler.HandleGetAllSongs)
 	err = http.ListenAndServe(":dbPort", nil)
 	if err != nil {
 		panic(err)
