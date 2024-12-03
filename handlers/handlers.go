@@ -26,13 +26,17 @@ func (h *SongHandler) HandleGetAllSongs(w http.ResponseWriter, r *http.Request) 
 		Limit:       r.URL.Query().Get("limit"),
 	}
 
-	getAllSongsResponse, err := h.SongService.GetAllSongs(GetSongsFilterDTO)
+	songs, Pagination, err := h.SongService.GetAllSongs(GetSongsFilterDTO)
 	if err != nil {
 		http.Error(w, "Failed to get songs: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+	response := map[string]interface{}{
+		"songs":      songs,
+		"pagination": Pagination,
+	}
 
-	responseData, err := json.Marshal(getAllSongsResponse)
+	responseData, err := json.Marshal(response)
 	if err != nil {
 		http.Error(w, "Failed to encode response: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -51,12 +55,17 @@ func (h *SongHandler) HandleGetLyrics(w http.ResponseWriter, r *http.Request) {
 		Limit:  r.URL.Query().Get("limit"),
 	}
 
-	lyrics, err := h.SongService.GetLyricsWithPagination(GetLyricsDTO)
+	lyrics, Pagination, err := h.SongService.GetLyricsWithPagination(GetLyricsDTO)
 	if err != nil {
 		http.Error(w, "Failed to get lyrics: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	responseData, err := json.Marshal(lyrics)
+	response := map[string]interface{}{
+		"lyrics":     lyrics,
+		"pagination": Pagination,
+	}
+
+	responseData, err := json.Marshal(response)
 	if err != nil {
 		http.Error(w, "Failed to encode response: "+err.Error(), http.StatusInternalServerError)
 		return

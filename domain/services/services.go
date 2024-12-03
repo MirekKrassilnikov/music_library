@@ -59,43 +59,18 @@ func (s *SongService) GetAllSongs(filters dto.GetSongsFilterDTO) ([]models.Song,
 	if len(AppendStrings) > 0 {
 		countQuery += strings.Join(AppendStrings, " AND ")
 	}
-
-	// Выполняем запрос для подсчета
 	var totalCount int
-	var page int
-	var limit int
 	err := s.DB.QueryRow(countQuery).Scan(&totalCount)
 	if err != nil {
-		if err != nil {
-			return nil, dto.Pagination{}, fmt.Errorf("database query failed: %w", err)
-		}
+		return nil, dto.Pagination{}, fmt.Errorf("database query failed: %w", err)
 	}
 
-	if filters.Page != "" {
-		var err error
-		page, err := strconv.Atoi(filters.Page)
-		if err != nil || page < 1 {
-			page = 1
-		}
+	Pagination, err := s.GetPagination(totalCount, filters.Page, filters.Limit)
+	if err != nil {
+		return nil, dto.Pagination{}, fmt.Errorf("pagination calculation failed: %w", err)
 	}
-	if filters.Limit != "" {
-		var err error
-		limit, err := strconv.Atoi(filters.Limit)
-		if err != nil || limit < 1 {
-			limit = 10
-		}
 
-	}
-	totalPages := totalCount / limit
-	offset := (page - 1) * limit
-	queryString += fmt.Sprintf(" LIMIT %d OFFSET %d", filters.Limit, offset)
-
-	Pagination := dto.Pagination{
-		CurrentPage: page,
-		PageSize:    limit,
-		TotalItems:  totalCount,
-		TotalPages:  totalPages,
-	}
+	queryString += fmt.Sprintf(" LIMIT %d OFFSET %d", filters.Limit, Pagination.Offset)
 
 	rows, err := s.DB.Query(queryString)
 	if err != nil {
@@ -115,12 +90,45 @@ func (s *SongService) GetAllSongs(filters dto.GetSongsFilterDTO) ([]models.Song,
 	return Songs, Pagination, nil
 }
 
-func (s *SongService) GetLyricsWithPagination(lyricsReq dto.GetLyricsDTO) ([]string, dto.Pagination, error) {
+func (s *SongService) GetPagination(totalCount int, pageStr string, limitStr string) (dto.Pagination, error) {
 
-	var Pagination dto.Pagination
-	var end int
-	var page int
-	var limit int
+	// Парсим номер страницы
+	page := 1
+	if pageStr != "" {
+		page, err := strconv.Atoi(pageStr)
+		if err != nil || page < 1 {
+			page = 1
+		}
+	}
+
+	// Парсим лимит
+	limit := 10
+	if limitStr != "" {
+		limit, err := strconv.Atoi(limitStr)
+		if err != nil || limit < 1 {
+			limit = 10
+		}
+	}
+
+	// Вычисляем общее количество страниц (округляем вверх)
+	totalPages := (totalCount + limit - 1) / limit
+
+	// Вычисляем смещение (offset) для пагинации
+	offset := (page - 1) * limit
+
+	// Создаём объект пагинации
+	pagination := dto.Pagination{
+		CurrentPage: page,
+		PageSize:    limit,
+		TotalItems:  totalCount,
+		TotalPages:  totalPages,
+		Offset:      offset, // Добавляем offset, если нужен для запроса
+	}
+
+	return pagination, nil
+}
+
+func (s *SongService) GetLyricsWithPagination(lyricsReq dto.GetLyricsDTO) ([]string, dto.Pagination, error) {
 
 	text, err := s.GetLyricsById(lyricsReq.SongId)
 	if err != nil {
@@ -130,43 +138,18 @@ func (s *SongService) GetLyricsWithPagination(lyricsReq dto.GetLyricsDTO) ([]str
 	totalCount := len(SplitedText)
 
 	if lyricsReq.Page != "" {
+		Pagination, err := s.GetPagination(totalCount, lyricsReq.Page, lyricsReq.Limit)
+		if err != nil {
+			return nil, dto.Pagination{}, fmt.Errorf("pagination calculation failed: %w", err)
+		}
 
-		var err error
-		page, err := strconv.Atoi(lyricsReq.Page)
-		if err != nil || page < 1 {
-			page = 1
-		}
-	}
-	if lyricsReq.Limit != "" {
-		var err error
-		limit, err := strconv.Atoi(lyricsReq.Limit)
-		if err != nil || limit < 1 {
-			limit = 10
-		}
-	}
-	if page > 0 {
-		totalPages := totalCount / limit
-		offset := (page - 1) * limit
-
-		end = offset + limit
-		if end > len(SplitedText) {
-			end = len(SplitedText)
-		}
-		if offset > len(SplitedText) {
-			offset = len(SplitedText)
-		}
-		Pagination = dto.Pagination{
-			CurrentPage: page,
-			PageSize:    limit,
-			TotalItems:  totalCount,
-			TotalPages:  totalPages,
-		}
+		end := Pagination.Offset + Pagination.PageSize
 
 		// Возвращаем нужный диапазон куплетов
-		return SplitedText[offset:end], Pagination, nil
+		return SplitedText[Pagination.Offset:end], Pagination, nil
 	}
 
-	return SplitedText, Pagination, nil
+	return SplitedText, dto.Pagination{}, nil
 }
 
 func (s *SongService) GetLyricsById(id string) (string, error) {
