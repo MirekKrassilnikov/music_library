@@ -17,6 +17,7 @@ import (
 	"github.com/pressly/goose/v3"
 )
 
+//func to load .env file
 func LoadEnv() {
 	err := godotenv.Load("./.env")
 	if err != nil {
@@ -26,15 +27,14 @@ func LoadEnv() {
 func main() {
 	handler := slog.NewTextHandler(os.Stdout, nil)
 	logger := slog.New(handler)
-	//загружаем файл env
+	//loading env file
 	LoadEnv()
-	// Читаем переменные из окружения
-	//dbHost := os.Getenv("DB_HOST")
-	//dbPort := os.Getenv("DB_PORT")
+	// reading variables
 	dbUser := os.Getenv("DB_USER")
 	//dbPassword := os.Getenv("DB_PASSWORD")
 	dbName := os.Getenv("DB_NAME")
 
+	//connecting to default database
 	connectStr := fmt.Sprintf("user=%s dbname=postgres sslmode=disable", dbUser)
 	db, err := sql.Open("postgres", connectStr)
 	if err != nil {
@@ -42,6 +42,7 @@ func main() {
 	}
 	defer db.Close()
 
+	//Check if database dbName exists
 	var exists bool
 	err = db.QueryRow(fmt.Sprintf("SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname = '%s')", dbName)).Scan(&exists)
 	if err != nil {
@@ -49,7 +50,7 @@ func main() {
 	}
 
 	if !exists {
-		// Создаем базу данных, если она не существует
+		// Createing database dbName
 		_, err := db.Exec(fmt.Sprintf("CREATE DATABASE %s", dbName))
 		if err != nil {
 			log.Fatalf("failed to create database: %v", err)
@@ -59,37 +60,28 @@ func main() {
 		log.Printf("Database %s already exists", dbName)
 	}
 
+	//Migration
 	err = goose.Up(db, "./migrations")
 	if err != nil {
 		log.Fatalf("failed to apply migrations: %v", err)
 	}
 	logger.Info("%d Migrations applied successfully")
-	// Создаем SongService
+
+	// Create SongService
 	songService := &services.SongService{DB: db}
 
-	// Создаем SongHandler
+	// Create SongHandler
 	songHandler := &handlers.SongHandler{SongService: songService}
 
-	// Создаем маршруты
+	// Create routes
 	mux := http.NewServeMux()
 	routes.RegisterRoutes(mux, songHandler)
 
-	// Запускаем сервер
+	// Starting server
 	logger.Info("Starting server on :8080")
 	err = http.ListenAndServe(":8080", mux)
 	if err != nil {
 		logger.Error("Server failed to start", slog.String("error", err.Error()))
 	}
-
-	// Создаем маршруты
-	mux = http.NewServeMux()
-	routes.RegisterRoutes(mux, songHandler)
-
-	// Запускаем сервер
-	logger.Info("Starting server on :8080")
-	err = http.ListenAndServe(":8080", mux)
-	if err != nil {
-		logger.Error("Server failed to start", slog.String("error", err.Error()))
-	}
-
+	
 }

@@ -5,14 +5,15 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/MirekKrassilnikov/music_library/dto"
-	"github.com/MirekKrassilnikov/music_library/services"
+	"github.com/MirekKrassilnikov/music_library/domain/dto"
+	"github.com/MirekKrassilnikov/music_library/domain/services"
 )
 
 type SongHandler struct {
 	SongService *services.SongService
 }
 
+// Handler for GET /songs - returns list of songs
 func (h *SongHandler) HandleGetAllSongs(w http.ResponseWriter, r *http.Request) {
 
 	var page int
