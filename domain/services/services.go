@@ -19,7 +19,7 @@ type SongService struct {
 }
 
 // GetAllSongs обрабатывает бизнес-логику поиска песен
-func (s *SongService) GetAllSongs(filters dto.GetSongsFilterDTO) ([]models.Song, error) {
+func (s *SongService) GetAllSongs(filters dto.GetSongsFilterDTO) ([]models.Song, dto.Pagination, error) {
 
 	var AppendStrings []string
 	queryString := "SELECT * FROM songs WHERE "
@@ -55,8 +55,22 @@ func (s *SongService) GetAllSongs(filters dto.GetSongsFilterDTO) ([]models.Song,
 	}
 
 	// Добавляем пагинацию
+	countQuery := "SELECT COUNT(*) FROM songs WHERE "
+	if len(AppendStrings) > 0 {
+		countQuery += strings.Join(AppendStrings, " AND ")
+	}
+
+	// Выполняем запрос для подсчета
+	var totalCount int
 	var page int
 	var limit int
+	err := s.DB.QueryRow(countQuery).Scan(&totalCount)
+	if err != nil {
+		if err != nil {
+			return nil, dto.Pagination{}, fmt.Errorf("database query failed: %w", err)
+		}
+	}
+
 	if filters.Page != "" {
 		var err error
 		page, err := strconv.Atoi(filters.Page)
@@ -70,15 +84,22 @@ func (s *SongService) GetAllSongs(filters dto.GetSongsFilterDTO) ([]models.Song,
 		if err != nil || limit < 1 {
 			limit = 10
 		}
+
 	}
+	totalPages := totalCount / limit
 	offset := (page - 1) * limit
 	queryString += fmt.Sprintf(" LIMIT %d OFFSET %d", filters.Limit, offset)
 
-	log.Print(queryString)
+	Pagination := dto.Pagination{
+		CurrentPage: page,
+		PageSize:    limit,
+		TotalItems:  totalCount,
+		TotalPages:  totalPages,
+	}
 
 	rows, err := s.DB.Query(queryString)
 	if err != nil {
-		return nil, fmt.Errorf("database query failed: %w", err)
+		return nil, dto.Pagination{}, fmt.Errorf("database query failed: %w", err)
 	}
 	defer rows.Close()
 
@@ -86,25 +107,30 @@ func (s *SongService) GetAllSongs(filters dto.GetSongsFilterDTO) ([]models.Song,
 	for rows.Next() {
 		var song models.Song
 		if err := rows.Scan(&song.Group, &song.Song, &song.Text, &song.ReleaseDate, &song.Link); err != nil {
-			return nil, fmt.Errorf("error reading from database: %w", err)
+			return nil, dto.Pagination{}, fmt.Errorf("error reading from database: %w", err)
 		}
 
 		Songs = append(Songs, song)
 	}
-	return Songs, nil
+	return Songs, Pagination, nil
 }
 
-func (s *SongService) GetLyricsWithPagination(lyricsReq dto.GetLyricsDTO) ([]string, error) {
+func (s *SongService) GetLyricsWithPagination(lyricsReq dto.GetLyricsDTO) ([]string, dto.Pagination, error) {
 
-	text, err := s.GetLyricsById(lyricsReq.SongId)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get lyrics: %w", err)
-	}
-	SplitedText := SplitIntoVerses(text)
+	var Pagination dto.Pagination
 	var end int
 	var page int
 	var limit int
+
+	text, err := s.GetLyricsById(lyricsReq.SongId)
+	if err != nil {
+		return nil, dto.Pagination{}, fmt.Errorf("failed to get lyrics: %w", err)
+	}
+	SplitedText := SplitIntoVerses(text)
+	totalCount := len(SplitedText)
+
 	if lyricsReq.Page != "" {
+
 		var err error
 		page, err := strconv.Atoi(lyricsReq.Page)
 		if err != nil || page < 1 {
@@ -119,27 +145,28 @@ func (s *SongService) GetLyricsWithPagination(lyricsReq dto.GetLyricsDTO) ([]str
 		}
 	}
 	if page > 0 {
-		start := page - 1
+		totalPages := totalCount / limit
+		offset := (page - 1) * limit
 
-		// Устанавливаем значение Limit (максимум 30)
-		if limit > 30 {
-			limit = 30
-		} else if limit <= 0 { // Защита от некорректного значения Limit
-			limit = 30 // Значение по умолчанию, если Limit не задан или <= 0
-		}
-		end = start + limit
+		end = offset + limit
 		if end > len(SplitedText) {
 			end = len(SplitedText)
 		}
-		if start > len(SplitedText) {
-			start = len(SplitedText)
+		if offset > len(SplitedText) {
+			offset = len(SplitedText)
+		}
+		Pagination = dto.Pagination{
+			CurrentPage: page,
+			PageSize:    limit,
+			TotalItems:  totalCount,
+			TotalPages:  totalPages,
 		}
 
 		// Возвращаем нужный диапазон куплетов
-		return SplitedText[start:end], nil
+		return SplitedText[offset:end], Pagination, nil
 	}
 
-	return SplitedText, nil
+	return SplitedText, Pagination, nil
 }
 
 func (s *SongService) GetLyricsById(id string) (string, error) {
