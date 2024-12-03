@@ -9,8 +9,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/MirekKrassilnikov/music_library/dto"
-	"github.com/MirekKrassilnikov/music_library/models"
+	"github.com/MirekKrassilnikov/music_library/domain/dto"
+	"github.com/MirekKrassilnikov/music_library/domain/models"
 )
 
 type SongService struct {
@@ -88,13 +88,19 @@ func (s *SongService) GetLyricsWithPagination(lyricsReq dto.GetLyricsDTO) ([]str
 	if lyricsReq.Page > 0 {
 		start := lyricsReq.Page - 1
 
-		if lyricsReq.Limit > 0 {
-			end = start + lyricsReq.Limit
-			if end > len(SplitedText) {
-				end = len(SplitedText)
-			}
+		// Устанавливаем значение Limit (максимум 30)
+		if lyricsReq.Limit > 30 {
+			lyricsReq.Limit = 30
+		} else if lyricsReq.Limit <= 0 { // Защита от некорректного значения Limit
+			lyricsReq.Limit = 30 // Значение по умолчанию, если Limit не задан или <= 0
 		}
-		end = len(SplitedText)
+		end = start + lyricsReq.Limit
+		if end > len(SplitedText) {
+			end = len(SplitedText)
+		}
+		if start > len(SplitedText) {
+			start = len(SplitedText)
+		}
 
 		// Возвращаем нужный диапазон куплетов
 		return SplitedText[start:end], nil
@@ -116,7 +122,7 @@ func (s *SongService) GetLyricsById(id string) (string, error) {
 }
 
 func SplitIntoVerses(text string) []string {
-	verses := strings.Split(text, "\n")
+	verses := strings.Split(text, "\n\n")
 	for i, verse := range verses {
 		verses[i] = strings.TrimSpace(verse)
 	}

@@ -4,16 +4,17 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 
+	"github.com/MirekKrassilnikov/music_library/routes"
 	_ "github.com/lib/pq"
 
+	"github.com/MirekKrassilnikov/music_library/domain/services"
 	"github.com/MirekKrassilnikov/music_library/handlers"
-	"github.com/MirekKrassilnikov/music_library/services"
 	"github.com/joho/godotenv"
 	"github.com/pressly/goose/v3"
-	"github.com/sirupsen/logrus"
 )
 
 func LoadEnv() {
@@ -23,6 +24,8 @@ func LoadEnv() {
 	}
 }
 func main() {
+	handler := slog.NewTextHandler(os.Stdout, nil)
+	logger := slog.New(handler)
 	//загружаем файл env
 	LoadEnv()
 	// Читаем переменные из окружения
@@ -51,7 +54,7 @@ func main() {
 		if err != nil {
 			log.Fatalf("failed to create database: %v", err)
 		}
-		log.Printf("Database %s created successfully", dbName)
+		logger.Info("Database %s created successfully", dbName)
 	} else {
 		log.Printf("Database %s already exists", dbName)
 	}
@@ -60,22 +63,33 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to apply migrations: %v", err)
 	}
-	log.Printf("%d Migrations applied successfully")
+	logger.Info("%d Migrations applied successfully")
 	// Создаем SongService
 	songService := &services.SongService{DB: db}
 
 	// Создаем SongHandler
 	songHandler := &handlers.SongHandler{SongService: songService}
 
-	//запускаем сервер
-	logrus.Info("Запускаем сервер")
-	http.HandleFunc("/songs", songHandler.HandleGetAllSongs)
-	http.HandleFunc("/lyrics", songHandler.HandleGetLyrics)
-	http.HandleFunc("/delete", songHandler.HandleDeleteSong)
-	http.HandleFunc("/add", songHandler.HandleAddNewSong)
-	err = http.ListenAndServe(":8080", nil)
+	// Создаем маршруты
+	mux := http.NewServeMux()
+	routes.RegisterRoutes(mux, songHandler)
+
+	// Запускаем сервер
+	logger.Info("Starting server on :8080")
+	err = http.ListenAndServe(":8080", mux)
 	if err != nil {
-		panic(err)
+		logger.Error("Server failed to start", slog.String("error", err.Error()))
+	}
+
+	// Создаем маршруты
+	mux = http.NewServeMux()
+	routes.RegisterRoutes(mux, songHandler)
+
+	// Запускаем сервер
+	logger.Info("Starting server on :8080")
+	err = http.ListenAndServe(":8080", mux)
+	if err != nil {
+		logger.Error("Server failed to start", slog.String("error", err.Error()))
 	}
 
 }
