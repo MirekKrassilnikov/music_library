@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
 
 	"github.com/MirekKrassilnikov/music_library/domain/dto"
 	"github.com/MirekKrassilnikov/music_library/domain/services"
@@ -16,23 +15,6 @@ type SongHandler struct {
 // Handler for GET /songs - returns list of songs
 func (h *SongHandler) HandleGetAllSongs(w http.ResponseWriter, r *http.Request) {
 
-	var page int
-	var limit int
-	if r.URL.Query().Get("page") != "" {
-		var err error
-		page, err := strconv.Atoi(r.URL.Query().Get("page"))
-		if err != nil || page < 1 {
-			page = 1
-		}
-	}
-	if r.URL.Query().Get("limit") != "" {
-		var err error
-		limit, err := strconv.Atoi(r.URL.Query().Get("limit"))
-		if err != nil || limit < 1 {
-			limit = 10
-		}
-	}
-
 	GetSongsFilterDTO := dto.GetSongsFilterDTO{
 		SongId:      r.URL.Query().Get("id"),
 		Group:       r.URL.Query().Get("group"),
@@ -40,8 +22,8 @@ func (h *SongHandler) HandleGetAllSongs(w http.ResponseWriter, r *http.Request) 
 		ReleaseDate: r.URL.Query().Get("releaseDate"),
 		Text:        r.URL.Query().Get("text"),
 		Link:        r.URL.Query().Get("link"),
-		Page:        page,
-		Limit:       limit,
+		Page:        r.URL.Query().Get("page"),
+		Limit:       r.URL.Query().Get("limit"),
 	}
 
 	getAllSongsResponse, err := h.SongService.GetAllSongs(GetSongsFilterDTO)
@@ -62,28 +44,11 @@ func (h *SongHandler) HandleGetAllSongs(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *SongHandler) HandleGetLyrics(w http.ResponseWriter, r *http.Request) {
-	// Переводим параметры в int
-	var page int
-	var limit int
-	if r.URL.Query().Get("page") != "" {
-		var err error
-		page, err := strconv.Atoi(r.URL.Query().Get("page"))
-		if err != nil || page < 1 {
-			page = 1
-		}
-	}
-	if r.URL.Query().Get("limit") != "" {
-		var err error
-		limit, err := strconv.Atoi(r.URL.Query().Get("limit"))
-		if err != nil || limit < 1 {
-			limit = 10
-		}
-	}
 
 	GetLyricsDTO := dto.GetLyricsDTO{
 		SongId: r.URL.Query().Get("id"),
-		Page:   page,
-		Limit:  limit,
+		Page:   r.URL.Query().Get("page"),
+		Limit:  r.URL.Query().Get("limit"),
 	}
 
 	lyrics, err := h.SongService.GetLyricsWithPagination(GetLyricsDTO)

@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/MirekKrassilnikov/music_library/domain/dto"
@@ -54,7 +55,23 @@ func (s *SongService) GetAllSongs(filters dto.GetSongsFilterDTO) ([]models.Song,
 	}
 
 	// Добавляем пагинацию
-	offset := (filters.Page - 1) * filters.Limit
+	var page int
+	var limit int
+	if filters.Page != "" {
+		var err error
+		page, err := strconv.Atoi(filters.Page)
+		if err != nil || page < 1 {
+			page = 1
+		}
+	}
+	if filters.Limit != "" {
+		var err error
+		limit, err := strconv.Atoi(filters.Limit)
+		if err != nil || limit < 1 {
+			limit = 10
+		}
+	}
+	offset := (page - 1) * limit
 	queryString += fmt.Sprintf(" LIMIT %d OFFSET %d", filters.Limit, offset)
 
 	log.Print(queryString)
@@ -85,16 +102,32 @@ func (s *SongService) GetLyricsWithPagination(lyricsReq dto.GetLyricsDTO) ([]str
 	}
 	SplitedText := SplitIntoVerses(text)
 	var end int
-	if lyricsReq.Page > 0 {
-		start := lyricsReq.Page - 1
+	var page int
+	var limit int
+	if lyricsReq.Page != "" {
+		var err error
+		page, err := strconv.Atoi(lyricsReq.Page)
+		if err != nil || page < 1 {
+			page = 1
+		}
+	}
+	if lyricsReq.Limit != "" {
+		var err error
+		limit, err := strconv.Atoi(lyricsReq.Limit)
+		if err != nil || limit < 1 {
+			limit = 10
+		}
+	}
+	if page > 0 {
+		start := page - 1
 
 		// Устанавливаем значение Limit (максимум 30)
-		if lyricsReq.Limit > 30 {
-			lyricsReq.Limit = 30
-		} else if lyricsReq.Limit <= 0 { // Защита от некорректного значения Limit
-			lyricsReq.Limit = 30 // Значение по умолчанию, если Limit не задан или <= 0
+		if limit > 30 {
+			limit = 30
+		} else if limit <= 0 { // Защита от некорректного значения Limit
+			limit = 30 // Значение по умолчанию, если Limit не задан или <= 0
 		}
-		end = start + lyricsReq.Limit
+		end = start + limit
 		if end > len(SplitedText) {
 			end = len(SplitedText)
 		}

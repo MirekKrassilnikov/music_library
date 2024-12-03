@@ -8,8 +8,8 @@ type GetSongsFilterDTO struct {
 	ReleaseDate string `json:"releaseDate"`
 	Text        string `json:"text"`
 	Link        string `json:"link"`
-	Page        int    `json:"page"`
-	Limit       int    `json:"limit"`
+	Page        string `json:"page"`
+	Limit       string `json:"limit"`
 }
 
 // DTO для ответа
@@ -23,8 +23,8 @@ type SongDTO struct {
 
 type GetLyricsDTO struct {
 	SongId string `json:"song_id"`
-	Page   int    `json:"page"`
-	Limit  int    `json:"limit"`
+	Page   string `json:"page"`
+	Limit  string `json:"limit"`
 }
 
 type NewSongDTO struct {

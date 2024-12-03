@@ -17,7 +17,7 @@ import (
 	"github.com/pressly/goose/v3"
 )
 
-//func to load .env file
+// func to load .env file
 func LoadEnv() {
 	err := godotenv.Load("./.env")
 	if err != nil {
@@ -31,11 +31,16 @@ func main() {
 	LoadEnv()
 	// reading variables
 	dbUser := os.Getenv("DB_USER")
-	//dbPassword := os.Getenv("DB_PASSWORD")
+	dbPassword := os.Getenv("DB_PASSWORD")
 	dbName := os.Getenv("DB_NAME")
+	dbHost := os.Getenv("DB_HOST")
+	dbPort := os.Getenv("DB_PORT")
+	dbSslmode := os.Getenv("DB_SSLMODE")
 
 	//connecting to default database
-	connectStr := fmt.Sprintf("user=%s dbname=postgres sslmode=disable", dbUser)
+	connectStr := fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%s sslmode=%s",
+		dbUser, dbPassword, dbName, dbHost, dbPort, dbSslmode)
+
 	db, err := sql.Open("postgres", connectStr)
 	if err != nil {
 		log.Fatalf("failed to connect to database: %v", err)
@@ -83,5 +88,5 @@ func main() {
 	if err != nil {
 		logger.Error("Server failed to start", slog.String("error", err.Error()))
 	}
-	
+
 }
