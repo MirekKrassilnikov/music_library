@@ -1,0 +1,238 @@
+openapi: 3.0.1
+info:
+  title: Music Library API
+  description: This API provides functionality to manage a music library, including songs, lyrics, and more.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080
+paths:
+  /songs:
+    get:
+      summary: Get all songs
+      description: Returns a list of songs with optional filters and pagination.
+      parameters:
+        - name: id
+          in: query
+          description: Filter songs by ID
+          required: false
+          schema:
+            type: string
+        - name: group
+          in: query
+          description: Filter songs by group name
+          required: false
+          schema:
+            type: string
+        - name: song
+          in: query
+          description: Filter songs by song name
+          required: false
+          schema:
+            type: string
+        - name: releaseDate
+          in: query
+          description: Filter songs by release date
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: text
+          in: query
+          description: Filter songs by text
+          required: false
+          schema:
+            type: string
+        - name: link
+          in: query
+          description: Filter songs by link
+          required: false
+          schema:
+            type: string
+        - name: page
+          in: query
+          description: The page number for pagination
+          required: false
+          schema:
+            type: string
+            example: "1"
+        - name: limit
+          in: query
+          description: The number of songs per page
+          required: false
+          schema:
+            type: string
+            example: "10"
+      responses:
+        '200':
+          description: A list of songs with pagination
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  songs:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        group:
+                          type: string
+                        song:
+                          type: string
+                        text:
+                          type: string
+                        releaseDate:
+                          type: string
+                          format: date
+                        link:
+                          type: string
+                  pagination:
+                    type: object
+                    properties:
+                      currentPage:
+                        type: integer
+                      pageSize:
+                        type: integer
+                      totalItems:
+                        type: integer
+                      totalPages:
+                        type: integer
+                      offset:
+                        type: integer
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+
+  /lyrics:
+    get:
+      summary: Get lyrics of a song
+      description: Returns the lyrics of a song with pagination support.
+      parameters:
+        - name: id
+          in: query
+          description: The ID of the song to fetch lyrics for
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          description: The page number for pagination
+          required: false
+          schema:
+            type: string
+            example: "1"
+        - name: limit
+          in: query
+          description: The number of lyrics per page
+          required: false
+          schema:
+            type: string
+            example: "10"
+      responses:
+        '200':
+          description: The lyrics of the song with pagination
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  lyrics:
+                    type: array
+                    items:
+                      type: string
+                  pagination:
+                    type: object
+                    properties:
+                      currentPage:
+                        type: integer
+                      pageSize:
+                        type: integer
+                      totalItems:
+                        type: integer
+                      totalPages:
+                        type: integer
+                      offset:
+                        type: integer
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+
+  /delete:
+    post:
+      summary: Delete a song
+      description: Deletes a song from the library by ID.
+      parameters:
+        - name: id
+          in: query
+          description: The ID of the song to delete
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The song was successfully deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+
+  /add:
+    post:
+      summary: Add a new song
+      description: Adds a new song to the library.
+      parameters:
+        - name: group
+          in: query
+          description: The group name of the song
+          required: true
+          schema:
+            type: string
+        - name: song
+          in: query
+          description: The song name
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The song was successfully added
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  songId:
+                    type: string
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string

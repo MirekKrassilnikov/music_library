@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 
@@ -18,61 +19,66 @@ type SongService struct {
 	DB *sql.DB
 }
 
-// GetAllSongs обрабатывает бизнес-логику поиска песен
 func (s *SongService) GetAllSongs(filters dto.GetSongsFilterDTO) ([]models.Song, dto.Pagination, error) {
 
-	var AppendStrings []string
-	queryString := "SELECT * FROM songs WHERE "
+	var conditions []string
+	var args []interface{}
 
+	// Формируем условия фильтрации и добавляем параметры
 	if filters.Group != "" {
-		appendString2 := "LOWER (group_name) LIKE LOWER ('%" + filters.Group + "%')"
-		AppendStrings = append(AppendStrings, appendString2)
+		conditions = append(conditions, "LOWER(group_name) LIKE LOWER(?)")
+		args = append(args, "%"+filters.Group+"%")
 	}
 
 	if filters.Song != "" {
-		appendString3 := "LOWER (song_name) LIKE LOWER ('%" + filters.Song + "%')"
-		AppendStrings = append(AppendStrings, appendString3)
+		conditions = append(conditions, "LOWER(song_name) LIKE LOWER(?)")
+		args = append(args, "%"+filters.Song+"%")
 	}
 
 	if filters.ReleaseDate != "" {
-		appendString4 := "release_date ='" + filters.ReleaseDate + "'"
-		AppendStrings = append(AppendStrings, appendString4)
+		conditions = append(conditions, "release_date = ?")
+		args = append(args, filters.ReleaseDate)
 	}
 
 	if filters.Text != "" {
-		appendString5 := "LOWER (text) LIKE LOWER ('%" + filters.Text + "%')"
-		AppendStrings = append(AppendStrings, appendString5)
+		conditions = append(conditions, "LOWER(text) LIKE LOWER(?)")
+		args = append(args, "%"+filters.Text+"%")
 	}
 
 	if filters.Link != "" {
-		appendString6 := "LOWER (link) LIKE LOWER ('%" + filters.Link + "%')"
-		AppendStrings = append(AppendStrings, appendString6)
+		conditions = append(conditions, "LOWER(link) LIKE LOWER(?)")
+		args = append(args, "%"+filters.Link+"%")
 	}
 
-	// Объединяем фильтры
-	if len(AppendStrings) > 0 {
-		queryString += strings.Join(AppendStrings, " AND ")
+	// Создаем часть запроса с WHERE
+	queryString := "SELECT * FROM songs"
+	if len(conditions) > 0 {
+		queryString += " WHERE " + strings.Join(conditions, " AND ")
 	}
 
-	// Добавляем пагинацию
-	countQuery := "SELECT COUNT(*) FROM songs WHERE "
-	if len(AppendStrings) > 0 {
-		countQuery += strings.Join(AppendStrings, " AND ")
+	// Подсчет количества записей для пагинации
+	countQuery := "SELECT COUNT(*) FROM songs"
+	if len(conditions) > 0 {
+		countQuery += " WHERE " + strings.Join(conditions, " AND ")
 	}
 	var totalCount int
-	err := s.DB.QueryRow(countQuery).Scan(&totalCount)
+	err := s.DB.QueryRow(countQuery, args...).Scan(&totalCount)
 	if err != nil {
 		return nil, dto.Pagination{}, fmt.Errorf("database query failed: %w", err)
 	}
 
+	// Получаем информацию о пагинации
 	Pagination, err := s.GetPagination(totalCount, filters.Page, filters.Limit)
 	if err != nil {
 		return nil, dto.Pagination{}, fmt.Errorf("pagination calculation failed: %w", err)
 	}
 
-	queryString += fmt.Sprintf(" LIMIT %d OFFSET %d", filters.Limit, Pagination.Offset)
+	// Добавляем LIMIT и OFFSET к запросу
+	queryString += fmt.Sprintf(" LIMIT ? OFFSET ?")
+	args = append(args, filters.Limit, Pagination.Offset)
 
-	rows, err := s.DB.Query(queryString)
+	// Выполняем запрос
+	rows, err := s.DB.Query(queryString, args...)
 	if err != nil {
 		return nil, dto.Pagination{}, fmt.Errorf("database query failed: %w", err)
 	}
@@ -87,12 +93,13 @@ func (s *SongService) GetAllSongs(filters dto.GetSongsFilterDTO) ([]models.Song,
 
 		Songs = append(Songs, song)
 	}
+
 	return Songs, Pagination, nil
 }
 
 func (s *SongService) GetPagination(totalCount int, pageStr string, limitStr string) (dto.Pagination, error) {
 
-	// Парсим номер страницы
+	// Parsing page number
 	page := 1
 	if pageStr != "" {
 		page, err := strconv.Atoi(pageStr)
@@ -101,7 +108,7 @@ func (s *SongService) GetPagination(totalCount int, pageStr string, limitStr str
 		}
 	}
 
-	// Парсим лимит
+	// Parsing Limit
 	limit := 10
 	if limitStr != "" {
 		limit, err := strconv.Atoi(limitStr)
@@ -110,13 +117,12 @@ func (s *SongService) GetPagination(totalCount int, pageStr string, limitStr str
 		}
 	}
 
-	// Вычисляем общее количество страниц (округляем вверх)
+	// Calculation total ammount of pages
 	totalPages := (totalCount + limit - 1) / limit
 
-	// Вычисляем смещение (offset) для пагинации
+	// Calculating offset
 	offset := (page - 1) * limit
 
-	// Создаём объект пагинации
 	pagination := dto.Pagination{
 		CurrentPage: page,
 		PageSize:    limit,
@@ -145,7 +151,7 @@ func (s *SongService) GetLyricsWithPagination(lyricsReq dto.GetLyricsDTO) ([]str
 
 		end := Pagination.Offset + Pagination.PageSize
 
-		// Возвращаем нужный диапазон куплетов
+		// Returning requested range
 		return SplitedText[Pagination.Offset:end], Pagination, nil
 	}
 
@@ -212,11 +218,16 @@ func (s *SongService) AddNewSong(group, song string) (string, error) {
 }
 
 func getAddictionalInfo(group, song string) (dto.AddictionalInfo, error) {
-	// Формируем URL для запроса
-	apiUrl := fmt.Sprintf("http://localhost:8080/info?group=%s&song=%s", group, song)
 
-	// Выполняем HTTP-запрос
-	resp, err := http.Get(apiUrl)
+	apiUrl := os.Getenv("API_URL")
+	if apiUrl == "" {
+		return dto.AddictionalInfo{}, fmt.Errorf("API_URL environment variable is not set")
+	}
+
+	url := fmt.Sprintf("%s/info?group=%s&song=%s", apiUrl, group, song)
+
+	// Sending request
+	resp, err := http.Get(url)
 	if err != nil {
 		return dto.AddictionalInfo{}, fmt.Errorf("failed to call external API: %w", err)
 	}
@@ -225,7 +236,7 @@ func getAddictionalInfo(group, song string) (dto.AddictionalInfo, error) {
 	if resp.StatusCode != http.StatusOK {
 		return dto.AddictionalInfo{}, fmt.Errorf("API request failed with status: %s", resp.Status)
 	}
-	// Читаем тело ответа
+	// Reading body
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return dto.AddictionalInfo{}, fmt.Errorf("failed to read response body: %w", err)

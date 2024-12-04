@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  app:
+  music_library_app:
     build: .
     container_name: music_library_app
     env_file:
@@ -10,6 +10,9 @@ services:
       - "8080:8080"
     depends_on:
       - postgres
+    volumes:
+      - ./.env:/app/.env
+      - ./migrations:/app/migrations
 
   postgres:
     image: postgres:latest

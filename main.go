@@ -19,15 +19,17 @@ import (
 
 // func to load .env file
 func LoadEnv() {
+
 	err := godotenv.Load("./.env")
 	if err != nil {
 		log.Fatalf("Error loading .env file")
 	}
 }
+
 func main() {
 	handler := slog.NewTextHandler(os.Stdout, nil)
 	logger := slog.New(handler)
-	//loading env file
+
 	LoadEnv()
 	// reading variables
 	dbUser := os.Getenv("DB_USER")
@@ -37,15 +39,21 @@ func main() {
 	dbPort := os.Getenv("DB_PORT")
 	dbSslmode := os.Getenv("DB_SSLMODE")
 
+	logger.Info("Loaded environment variables")
+
 	//connecting to default database
+
 	connectStr := fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%s sslmode=%s",
 		dbUser, dbPassword, dbName, dbHost, dbPort, dbSslmode)
+
+	logger.Debug("Connecting to database", slog.String("connectionString", connectStr))
 
 	db, err := sql.Open("postgres", connectStr)
 	if err != nil {
 		log.Fatalf("failed to connect to database: %v", err)
 	}
 	defer db.Close()
+	logger.Info("Successfully connected to the database")
 
 	//Check if database dbName exists
 	var exists bool
